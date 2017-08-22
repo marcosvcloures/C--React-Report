@@ -1,4 +1,5 @@
-﻿using Newtonsoft.Json;
+﻿using Microsoft.Win32;
+using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -6,12 +7,22 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace ReportHTML
 {
     public class ReportHTML
     {
+        private string _location;
+
+        public string location
+        {
+            get { return _location; }
+        }
+
+        private string original_report;
+
         private string vars_json;
 
         private string vars
@@ -39,6 +50,29 @@ namespace ReportHTML
 
         public void set_report(string report_filename)
         {
+            original_report = report_filename;
+
+            try
+            {
+                string strKey = "Software\\Microsoft\\Internet Explorer\\PageSetup";
+                bool bolWritable = true;
+
+                string strName = "footer";
+                object oValue = "";
+                RegistryKey oKey = Registry.CurrentUser.OpenSubKey(strKey, bolWritable);
+                oKey.SetValue(strName, oValue);
+
+                strName = "header";
+                oKey = Registry.CurrentUser.OpenSubKey(strKey, bolWritable);
+                oKey.SetValue(strName, oValue);
+
+                oKey.Close();
+            }
+            catch
+            {
+
+            }
+
             var report = new StreamReader(report_filename);
 
             var report_jsx = report.ReadToEnd();
@@ -70,11 +104,48 @@ namespace ReportHTML
             html.Flush();
             html.Dispose();
             html.Close();
+
+            _location = Path.GetDirectoryName(Assembly.GetCallingAssembly().Location) + @"\Reporting\report.html";
+        }
+
+        public void ShowInBrowser()
+        {
+            Process.Start(Path.GetDirectoryName(Assembly.GetCallingAssembly().Location) + @"\Reporting\report.html");
         }
 
         public void Show()
         {
-            Process.Start(Path.GetDirectoryName(Assembly.GetCallingAssembly().Location) + @"\Reporting\report.html");
+            var browser = new WebView();
+
+            browser.navigateTo(location);
+
+            browser.Show();
+        }
+
+        public void DebugReport()
+        {
+            Show();
+
+            var task = new Task(() => { _set_report(); });
+
+            task.Start();
+        }
+
+        private void _set_report()
+        {
+            while (true)
+            {
+                try
+                {
+                    set_report(original_report);
+                }
+                catch
+                {
+
+                }
+
+                Thread.Sleep(1000);
+            }
         }
     }
 }
